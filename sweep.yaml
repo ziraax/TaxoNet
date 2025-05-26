@@ -1,0 +1,61 @@
+method: bayes  
+metric:
+  goal: maximize
+  name: metrics/accuracy_top1
+
+parameters:
+  model_name:
+    value: "resnet"
+
+  model_variant:
+    values: ["18", "34", "50"]
+
+  loss_type:
+    values: ["focal", "labelsmoothing", "weighted"]
+
+  optimizer:
+    values: ["adam", "sgd", "adamw"]
+
+  focal_alpha:
+    min: 0.1
+    max: 0.5
+
+  focal_gamma:
+    min: 1.0
+    max: 3.0
+
+  labelsmoothing_epsilon:
+    min: 0.05
+    max: 0.2
+
+  learning_rate:
+    distribution: log_uniform_values
+    min: 1e-5
+    max: 2e-3
+
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1e-4
+    max: 2e-1
+
+  batch_size:
+    values: [64, 128, 256]
+
+  epochs:
+    value: 100
+
+  early_stopping_patience:
+    value: 17
+
+  mc_dropout:
+    values: [true, false]
+
+  mc_p:
+    min: 0.1
+    max: 0.5
+  
+  freeze_backbone:
+    values: [false]
+
+  device:
+    value: "cuda"

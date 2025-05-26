@@ -1,0 +1,217 @@
+from datetime import datetime 
+import wandb
+import os
+import yaml
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import torch
+from pathlib import Path
+from ultralytics import YOLO
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score
+from config import CONFIG
+from tqdm import tqdm
+
+
+from PIL import Image
+from tqdm import tqdm
+
+def evaluate_yolo_model(model_path, data_dir, run_name):
+
+    wandb.init(
+        project=CONFIG['project_name'],
+        name=f"{CONFIG['model_name']}_{CONFIG['model_variant']}_evaluation_{run_name}",
+        job_type="Evaluation",
+        config=CONFIG,
+        tags=["evaluation", "custom_model", "classification", CONFIG['model_name']],
+    )
+
+
+    data_dir = Path(data_dir).resolve()
+    yaml_path = data_dir / "dataset.yaml"
+        
+    with open(yaml_path) as f:
+        data_cfg = yaml.safe_load(f)
+        
+    class_names = data_cfg['names']
+    test_dir = data_dir / data_cfg['test']
+        
+    # Map: class name -> class index
+    class_to_idx = {name: i for i, name in enumerate(class_names)}
+        
+    # Load model
+    model = YOLO(model_path)
+        
+    y_true, y_pred = [], []
+        
+    # Loop through val folder
+    for class_name in os.listdir(test_dir):
+        class_folder = test_dir / class_name
+        if not class_folder.is_dir():
+            continue
+        label_idx = class_to_idx[class_name]
+        for img_file in tqdm(list(class_folder.glob("*"))):
+            if not img_file.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+                continue
+            try:
+                pred = model.predict(str(img_file), verbose=False)[0]
+                pred_label = pred.probs.top1
+                y_true.append(label_idx)
+                y_pred.append(pred_label)
+            except Exception as e:
+                print(f"Error on image {img_file}: {e}")
+        
+
+    # Log standard metrics
+    print("[INFO] Logging standard metrics...")
+    log_core_metrics(y_true, y_pred, class_names)
+    print("[INFO] Logging evaluation details...")
+    log_evaluation_details(y_true, y_pred, class_names)  
+    print("[INFO] Evaluation complete.")
+    wandb.finish()
+
+def evaluate_metrics_only(model, val_loader, criterion=None):
+    model.eval()
+    device = next(model.parameters()).device
+
+    y_true, y_pred, y_pred_logits = [], [], []
+    mc_mean_all, mc_std_all = [], []
+    val_loss = 0.0
+
+    with torch.no_grad():
+        pbar = tqdm(val_loader, desc="Validating", leave=False)
+        for inputs, labels in pbar:
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            outputs = model(inputs)
+            preds = outputs.argmax(dim=1).cpu().numpy()
+            y_true.extend(labels.cpu().numpy())
+            y_pred.extend(preds)
+            y_pred_logits.append(outputs.cpu())
+
+            if criterion:
+                batch_loss = criterion(outputs, labels).item()
+                val_loss += batch_loss
+                pbar.set_postfix(loss=batch_loss)
+
+            #MC Dropout
+            if getattr(model, 'mc_dropout', False):
+                mean_probs, std_probs = model.predict_mc(inputs, T=20)
+                mc_mean_all.append(mean_probs.cpu())
+                mc_std_all.append(std_probs.cpu())
+
+
+    if criterion:
+        val_loss /= len(val_loader)
+
+    y_pred_logits = torch.cat(y_pred_logits)
+    top1 = accuracy_score(y_true, y_pred)
+
+    y_true_tensor = torch.tensor(y_true)
+    top5_preds = torch.topk(y_pred_logits, 5, dim=1).indices
+    top5_correct = top5_preds.eq(y_true_tensor.view(-1, 1)).sum().item()
+    top5 = top5_correct / len(y_true)
+
+    # Stack MC-Dropout tensors if available
+    mc_mean = torch.cat(mc_mean_all) if mc_mean_all else None
+    mc_std = torch.cat(mc_std_all) if mc_std_all else None
+
+    return val_loss, top1, top5, y_true, y_pred, y_pred_logits, mc_mean, mc_std
+
+# ---- LOGGING FUNCTIONS ---- #
+
+def log_core_metrics(y_true, y_pred, class_names):
+    wandb.log({
+        "test/metrics/accuracy": accuracy_score(y_true, y_pred),        
+        "test/metrics/precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
+        "test/metrics/precision_weighted": precision_score(y_true, y_pred, average="weighted", zero_division=0),
+        "test/metrics/recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
+        "test/metrics/recall_weighted": recall_score(y_true, y_pred, average="weighted", zero_division=0),
+    })
+
+def log_evaluation_details(y_true, y_pred, class_names, mc_mean=None, mc_std=None):
+    report_dict = classification_report(y_true, y_pred, target_names=class_names, output_dict=True, zero_division=0)
+    report_df = pd.DataFrame(report_dict).transpose().reset_index()
+    report_df.rename(columns={"index": "class"}, inplace=True)
+    # Filter the accuracy, macro avg, and weighted avg rows
+    report_df = report_df[~report_df['class'].isin(['accuracy', 'macro avg', 'weighted avg'])]
+    wandb.log({"classification_report": wandb.Table(dataframe=report_df)})
+
+    # F1 Score
+    f1_sorted_df = report_df[report_df['class'].isin(class_names)].sort_values("f1-score")
+    plt.figure(figsize=(12, max(6, len(f1_sorted_df) * 0.3)))
+    sns.barplot(data=f1_sorted_df, x='f1-score', y='class', hue='class', dodge=False, legend=False, palette='viridis')
+    plt.title("F1 Score per Class (Sorted)")
+    plt.xlim(0, 1)
+    wandb.log({"f1_score_per_class": wandb.Image(plt)})
+    plt.close()
+
+    # Precision
+    precision_sorted = report_df.sort_values("precision")
+    plt.figure(figsize=(12, max(6, len(precision_sorted) * 0.3)))
+    sns.barplot(data=precision_sorted, x='precision', y='class', hue='class', dodge=False, legend=False, palette='mako')
+    plt.title("Precision per Class (Sorted)")
+    plt.xlim(0, 1)
+    wandb.log({"precision_per_class": wandb.Image(plt)})
+    plt.close()
+
+    # Recall
+    recall_sorted = report_df.sort_values("recall")
+    plt.figure(figsize=(12, max(6, len(recall_sorted) * 0.3)))
+    sns.barplot(data=recall_sorted, x='recall', y='class', hue='class', dodge=False, legend=False, palette='crest')
+    plt.title("Recall per Class (Sorted)")
+    plt.xlim(0, 1)
+    wandb.log({"recall_per_class": wandb.Image(plt)})
+    plt.close()
+
+    # Confusion matrix raw
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(20, 15))
+    sns.heatmap(cm, annot=True, fmt='d', xticklabels=class_names, yticklabels=class_names)
+    plt.title("Confusion Matrix (Raw Counts)")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    wandb.log({"confusion_matrix_raw": wandb.Image(plt)})
+    plt.close()
+
+    # Confusion matrix normalized
+    cm_norm = confusion_matrix(y_true, y_pred, normalize='true')
+    plt.figure(figsize=(20, 15))
+    sns.heatmap(cm_norm, annot=True, fmt='.2f', xticklabels=class_names, yticklabels=class_names)
+    plt.title("Normalized Confusion Matrix")
+    plt.xlabel("Predicted Class")
+    plt.ylabel("True Class")
+    wandb.log({"normalized_confusion_matrix": wandb.Image(plt)})
+    plt.close()
+
+    # MC-Dropout uncertainty
+    if mc_mean is not None and mc_std is not None:
+        # Get the max std across classes (C) for each sample
+        max_std = mc_std.max(dim=1).values  # shape [B]
+
+        df_u = pd.DataFrame({
+            "class_pred": [class_names[i] for i in y_pred],
+            "uncertainty": max_std.numpy(),
+        })
+        
+        per_class_u = df_u.groupby("class_pred").mean().reset_index()
+        wandb.log({
+            "avg_epistemic_uncertainty": wandb.Table(dataframe=per_class_u),
+        })
+
+        plt.figure(figsize=(12, max(6, len(per_class_u) * 0.3)))
+        sns.histplot(max_std.numpy(), bins=50, kde=True)
+        plt.title("Distribution of Epistemic Uncertainty")
+        wandb.log({"epistemic_uncertainty_distribution": wandb.Image(plt)})
+        plt.close()
+
+
+def run_full_evaluation(model, val_loader, data_dir, criterion=None):
+    val_loss, top1, top5, y_true, y_pred, y_pred_logits, mc_mean, mc_std = evaluate_metrics_only(model, val_loader, criterion)
+
+    with open(Path(data_dir) / "dataset.yaml") as f:
+        class_names = yaml.safe_load(f)['names']
+
+    log_core_metrics(y_true, y_pred, class_names)
+    log_evaluation_details(y_true, y_pred, class_names, mc_mean=mc_mean, mc_std=mc_std)
