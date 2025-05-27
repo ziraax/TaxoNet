@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument('--image_dir', type=str, required=True)
     parser.add_argument('--model_name', type=str, choices=['resnet', 'densenet', 'efficientnet', 'yolov11'], required=True)
     parser.add_argument('--efficientnet_variant', type=str)
+    parser.add_argument('--resnet_variant', type=str)
     parser.add_argument('--densenet_variant', type=str)
     parser.add_argument('--weights_path', type=str, required=True)
     parser.add_argument('--mc_dropout', action='store_true',

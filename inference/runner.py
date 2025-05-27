@@ -29,7 +29,12 @@ def run_inference(args, CONFIG):
 
     class_names = get_classes_names()
     CONFIG['num_classes'] = len(class_names)
-    CONFIG['model_variant'] = args.densenet_variant if args.model_name == 'densenet' else args.efficientnet_variant
+    if args.model_name == 'densenet':
+        CONFIG['model_variant'] = args.densenet_variant
+    elif args.model_name == 'resnet':
+        CONFIG['model_variant'] = args.resnet_variant
+    else:
+        CONFIG['model_variant'] = args.efficientnet_variant
     CONFIG['img_size'] = get_input_size_for_model(args.model_name, CONFIG['model_variant'])
 
     all_results = []
@@ -62,8 +67,10 @@ def run_inference(args, CONFIG):
             num_classes=CONFIG['num_classes'],
             pretrained=False,
             efficientnet_variant=args.efficientnet_variant,
-            densenet_variant=args.densenet_variant
+            densenet_variant=args.densenet_variant,
+            resnet_variant=args.resnet_variant,
         )
+
         model.load_state_dict(torch.load(args.weights_path, map_location=args.device))
         model = model.to(args.device)
         model.eval()
