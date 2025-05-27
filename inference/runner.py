@@ -1,6 +1,7 @@
 import sys
 import os    
 import torch
+import torch.nn.functional as F
 from ultralytics import YOLO
 from torch.utils.data import DataLoader
 from inference.dataset import InferenceDataset
@@ -57,8 +58,6 @@ def run_inference(args, CONFIG):
 
     else:
         # Torchvision models
-
-
         dataset = InferenceDataset(image_paths, CONFIG['img_size'])
         dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -69,18 +68,25 @@ def run_inference(args, CONFIG):
             efficientnet_variant=args.efficientnet_variant,
             densenet_variant=args.densenet_variant,
             resnet_variant=args.resnet_variant,
+            mc_dropout=args.mc_dropout,
+            mc_p=args.mc_dropout_p if hasattr(args, "mc_dropout_p") else 0.5  # optional dropout prob        
         )
 
         model.load_state_dict(torch.load(args.weights_path, map_location=args.device))
         model = model.to(args.device)
+
+        # By default, we enable eval mode
         model.eval()
 
+        def enable_mc_dropout(m):
+            if isinstance(m, torch.nn.Dropout):
+                m.train()
+
         #--------- Monte Carlo Dropout ---------
-        if args.mc_dropout: 
-            model.train()
+        if args.mc_dropout:
+            model.apply(enable_mc_dropout)
             mc_iters = args.mc_iterations
         else:
-            model.eval()
             mc_iters = 1
         #---------------------------------------
         # Perform batch inference
@@ -91,26 +97,32 @@ def run_inference(args, CONFIG):
                 #--- Collect logits over N passes
                 mc_logits = []	
                 for _ in range(mc_iters):
-                    logits = model(batch_images)
-                    mc_logits.append(logits.unsqueeze(0)) # (1, B, C)
+                    logits = model(batch_images)            # (B, C)
+                    mc_logits.append(logits.unsqueeze(0))   # (1, B, C)
                 
-                logits_stack = torch.cat(mc_logits, dim=0) # (N, B, C)
-                mean_logits = logits_stack.mean(dim=0) # (B, C)
-                std_logits = logits_stack.std(dim=0)  # (B, C)
+                logits_stack = torch.cat(mc_logits, dim=0)  # (N, B, C)
 
-                batch_preds = topk_predictions(mean_logits, class_names, top_k=args.top_k)
+                # Compute probabilities (softmax) for each MC pass
+                probs_stack = F.softmax(logits_stack, dim=2)
+                # (N, B, C) -> (B, C)
+                mean_probs = probs_stack.mean(dim=0)
+                std_probs = probs_stack.std(dim=0)
+                
 
                 for i, path in enumerate(batch_paths):
-                    preds = batch_preds[i]
-                    pred_idx = class_names.index(preds[0][0])
-                    uncert   = round(std_logits[i, pred_idx].item(), 4)
+                    # Top-k indices and scores from mean probs
+                    topk_scores, topk_indices = mean_probs[i].topk(args.top_k)
+
+                    preds_with_uncertainty = []
+                    for score, idx in zip(topk_scores, topk_indices):
+                        class_name = class_names[idx]
+                        uncertainty = std_probs[i, idx].item()
+                        preds_with_uncertainty.append((class_name, round(score.item(), 4), round(uncertainty, 4)))
+
                     all_results.append({
-                        'image_path'  : path,
-                        'predictions' : preds,
-                        'uncertainty' : uncert
-                    })                    
-
-
+                        'image_path': path,
+                        'predictions': preds_with_uncertainty
+                    })
     if args.save_csv:
         from inference.utils import save_results
         save_results(all_results, args.save_csv)
