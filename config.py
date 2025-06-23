@@ -4,7 +4,7 @@ from pathlib import Path
 
 RAW_DATA_ROOT = Path("DATA/DATA_500_INDIV")
 PROCESSED_PATH = Path("DATA/processed_dataset")
-YOLO_DATASET_PATH = Path("DATA/yolo_dataset")
+FINAL_DATASET_PATH = Path("DATA/final_dataset")
 
 CONFIG = {
     # Project configuration
@@ -17,7 +17,7 @@ CONFIG = {
     # Path configuration 
     "raw_data_root": str(RAW_DATA_ROOT),
     "processed_path": str(PROCESSED_PATH),
-    "yolo_dataset_path": str(YOLO_DATASET_PATH),
+    "final_dataset_path": str(FINAL_DATASET_PATH),
 
     # Scale bar removal 
     "scalebar_model_path": "models/model_weights/scale_bar_remover/best.pt", # Path to the YOLO model for scale bar removal
