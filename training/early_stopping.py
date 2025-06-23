@@ -71,6 +71,6 @@ class EarlyStopping:
     def _save_checkpoint(self, model: torch.nn.Module, val_loss: float, val_acc: float):
         if self.verbose:
             self.trace_func(
-                f"[EarlyStopping][INFO] Saving new best : loss={val_loss:.4f}  acc={val_acc:.4f}"
+                f"[EarlyStopping][INFO] Saving new best : loss={val_loss:.4f}  acc={val_acc:.4f} in {self.path}"
             )
         torch.save(model.state_dict(), self.path)
