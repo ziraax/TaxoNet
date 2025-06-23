@@ -20,7 +20,7 @@ def get_train_dataloader(config):
     """
     Returns a DataLoader for the training dataset.
     """
-    train_dir = os.path.join(config['yolo_dataset_path'], 'train')
+    train_dir = os.path.join(config['final_dataset_path'], 'train')
     transform = get_default_transforms()
 
     train_dataset = datasets.ImageFolder(train_dir, transform=transform)
@@ -36,7 +36,7 @@ def get_test_dataloader(config):
     """
     Returns a DataLoader for the test dataset.
     """
-    test_dir = os.path.join(config['yolo_dataset_path'], 'test')
+    test_dir = os.path.join(config['final_dataset_path'], 'test')
     transform = get_default_transforms()
 
     test_dataset = datasets.ImageFolder(test_dir, transform=transform)
@@ -52,7 +52,7 @@ def get_val_dataloader(config):
     """
     Returns a DataLoader for the validation dataset.
     """
-    val_dir = os.path.join(config['yolo_dataset_path'], 'val')
+    val_dir = os.path.join(config['final_dataset_path'], 'val')
     transform = get_default_transforms()
 
     val_dataset = datasets.ImageFolder(val_dir, transform=transform)

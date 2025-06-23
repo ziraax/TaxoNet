@@ -13,7 +13,7 @@ def get_classes_names():
     """
     Returns a sorted list of class names from the training directory.
     """
-    train_path = os.path.join(CONFIG['yolo_dataset_path'], 'train')
+    train_path = os.path.join(CONFIG['final_dataset_path'], 'train')
     return sorted([d for d in os.listdir(train_path) if os.path.isdir(os.path.join(train_path, d))])
 
 
@@ -31,7 +31,7 @@ def get_class_distribution():
     """
     class_counts = defaultdict(int)
     for split in ['train', 'val', 'test']:
-        split_path = os.path.join(CONFIG['yolo_dataset_path'], split)
+        split_path = os.path.join(CONFIG['final_dataset_path'], split)
         for class_dir in os.listdir(split_path):
             class_path = os.path.join(split_path, class_dir)
             if os.path.isdir(class_path):

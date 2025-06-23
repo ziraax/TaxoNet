@@ -25,7 +25,7 @@ class YOLOv11Classifier:
 
             """
 
-            data_path = config["yolo_dataset_path"]
+            data_path = config["final_dataset_path"]
 
             results = self.model.train(
                 data=data_path,
@@ -37,7 +37,6 @@ class YOLOv11Classifier:
                 optimizer=config['optimizer'],
                 lr0=config['initial_lr'],
                 weight_decay=config['weight_decay'],
-                label_smoothing=config['label_smoothing'],
                 patience=config['early_stopping_patience'],
                 save_period=1,
                 project=config['project_name'],
