@@ -22,36 +22,29 @@ class WeightedLoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2, class_weights=None, device=None):
+    def __init__(self, alpha, gamma=2.0, device=None):
         super(FocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
-        self.class_weights = class_weights
         self.device = device
 
-        if self.class_weights is not None:
-            self.class_weights = torch.tensor(class_weights, dtype=torch.float).to(device)
-
     def forward(self, outputs, targets):
-        """
-        Calculate Focal Loss
-        :param outputs: predicted class scores, shape [batch_size, num_classes]
-        :param targets: true class labels, shape [batch_size]
-        """
-        # Apply softmax to get the probability distributions
-        probs = F.softmax(outputs, dim=-1)
-        
-        # Gather probabilities for the true class
-        probs_true_class = probs.gather(1, targets.unsqueeze(1))
-        
-        # Compute the focal loss component
-        loss = -self.alpha * (1 - probs_true_class) ** self.gamma * torch.log(probs_true_class)
-        
-        if self.class_weights is not None:
-            # Apply class weights if specified
-            loss = loss * self.class_weights[targets].unsqueeze(1)
-        
-        return loss.mean()  # Return the average loss for the batch
+        eps = 1e-8  # for numerical stability
+        probs = F.softmax(outputs, dim=-1)  # [B, C]
+        probs_true = probs.gather(1, targets.unsqueeze(1)).squeeze(1)  # [B]
+        probs_true = probs_true.clamp(min=eps, max=1.0)
+
+        # alpha can be scalar or class-specific
+        if self.alpha is not None:
+            if isinstance(self.alpha, torch.Tensor):
+                alpha_t = self.alpha[targets]  # [B]
+            else:
+                alpha_t = self.alpha  # scalar
+        else:
+            alpha_t = 1.0
+
+        loss = -alpha_t * (1 - probs_true) ** self.gamma * torch.log(probs_true)  # [B]
+        return loss.mean()
 
 
 class LabelSmoothingLoss(nn.Module):
