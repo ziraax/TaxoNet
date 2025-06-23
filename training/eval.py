@@ -9,7 +9,7 @@ import seaborn as sns
 import torch
 from pathlib import Path
 from ultralytics import YOLO
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score, precision_score, recall_score
 from config import CONFIG
 from tqdm import tqdm
 
@@ -71,7 +71,7 @@ def evaluate_yolo_model(model_path, data_dir, run_name):
     print("[INFO] Evaluation complete.")
     wandb.finish()
 
-def evaluate_metrics_only(model, val_loader, criterion=None):
+def evaluate_metrics_only(model, split, criterion):
     model.eval()
     device = next(model.parameters()).device
 
@@ -80,7 +80,7 @@ def evaluate_metrics_only(model, val_loader, criterion=None):
     val_loss = 0.0
 
     with torch.no_grad():
-        pbar = tqdm(val_loader, desc="Validating", leave=False)
+        pbar = tqdm(split, desc="Validating", leave=False)
         for inputs, labels in pbar:
             inputs, labels = inputs.to(device), labels.to(device)
 
@@ -103,7 +103,7 @@ def evaluate_metrics_only(model, val_loader, criterion=None):
 
 
     if criterion:
-        val_loss /= len(val_loader)
+        val_loss /= len(split)
 
     y_pred_logits = torch.cat(y_pred_logits)
     top1 = accuracy_score(y_true, y_pred)
@@ -121,13 +121,16 @@ def evaluate_metrics_only(model, val_loader, criterion=None):
 
 # ---- LOGGING FUNCTIONS ---- #
 
-def log_core_metrics(y_true, y_pred, class_names):
+def log_core_metrics(y_true, y_pred, class_names, prefix="test"):
     wandb.log({
-        "test/metrics/accuracy": accuracy_score(y_true, y_pred),        
-        "test/metrics/precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
-        "test/metrics/precision_weighted": precision_score(y_true, y_pred, average="weighted", zero_division=0),
-        "test/metrics/recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
-        "test/metrics/recall_weighted": recall_score(y_true, y_pred, average="weighted", zero_division=0),
+        f"{prefix}/metrics/accuracy": accuracy_score(y_true, y_pred),        
+        f"{prefix}/metrics/precision_macro": precision_score(y_true, y_pred, average="macro", zero_division=0),
+        f"{prefix}/metrics/precision_weighted": precision_score(y_true, y_pred, average="weighted", zero_division=0),
+        f"{prefix}/metrics/recall_macro": recall_score(y_true, y_pred, average="macro", zero_division=0),
+        f"{prefix}/metrics/recall_weighted": recall_score(y_true, y_pred, average="weighted", zero_division=0),
+        f"{prefix}/metrics/f1_macro": f1_score(y_true, y_pred, average="macro", zero_division=0),
+        f"{prefix}/metrics/f1_weighted": f1_score(y_true, y_pred, average="weighted", zero_division=0),
+
     })
 
 def log_evaluation_details(y_true, y_pred, class_names, mc_mean=None, mc_std=None):
@@ -207,11 +210,11 @@ def log_evaluation_details(y_true, y_pred, class_names, mc_mean=None, mc_std=Non
         plt.close()
 
 
-def run_full_evaluation(model, val_loader, data_dir, criterion=None):
-    val_loss, top1, top5, y_true, y_pred, y_pred_logits, mc_mean, mc_std = evaluate_metrics_only(model, val_loader, criterion)
+def run_test_full_evaluation(model, test_loader, data_dir, criterion=None):
+    test_loss, top1, top5, y_true, y_pred, y_pred_logits, mc_mean, mc_std = evaluate_metrics_only(model, test_loader, criterion=None)
 
     with open(Path(data_dir) / "dataset.yaml") as f:
         class_names = yaml.safe_load(f)['names']
 
-    log_core_metrics(y_true, y_pred, class_names)
+    log_core_metrics(y_true, y_pred, class_names, prefix="test")
     log_evaluation_details(y_true, y_pred, class_names, mc_mean=mc_mean, mc_std=mc_std)
