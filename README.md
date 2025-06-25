@@ -65,11 +65,13 @@ TODO
 ### Inference
 
 ```bash
-python predict.py \
-  --image_dir ./test_images \
-  --model_name densenet \
+python -m inference.predict \
+  --image_dir PATH/TO/UR/IMAGES \
+  --model_name [resnet, densenet, efficientnet, yolov11] \
+  --weights_path model_weights/[model_type]/[model_variant]/[run] \
   --densenet_variant 121 \
-  --weights_path ./best_weights/densenet121.pt \
+  --resnet_variant
+  --efficientnet_variant 
   --mc_dropout \
   --mc_iterations 30 \
   --save_csv predictions.csv \

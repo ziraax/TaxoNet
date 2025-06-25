@@ -37,7 +37,7 @@ def parse_args():
 
     # Add densenet_variant argument like --densenet_variant 121 or --densenet_variant 169
     parser.add_argument('--densenet_variant', type=str, default='densenet121',
-        choices=['121', '169', '201', '161'], help="Variant of DenseNet to use (default: densenet121)"
+        choices=['121', '169', '201', '161'], help="Variant of DenseNet to use (default: 121)"
     )
 
     # add resnet_variant argument like --resnet_variant 18 or --resnet_variant 34
