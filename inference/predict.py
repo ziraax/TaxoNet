@@ -5,7 +5,7 @@ import wandb
 import torch
 from inference.runner import run_inference
 from inference.visualize import visualize_predictions
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from PIL import Image
 from datetime import datetime 
 
@@ -27,14 +27,14 @@ def parse_args():
 
 def main():
     args = parse_args()
-    results = run_inference(args, CONFIG)
+    results = run_inference(args, DEFAULT_CONFIG)
 
     visualize_predictions(results)
 
     if args.wandb_log:
         wandb.init(
-            project=CONFIG.get('project_name', 'classification'),
-            name=f"{args.model_name}_{args.densenet_variant or args.efficientnet_variant or "Default"}_inference_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            project=DEFAULT_CONFIG.get('project_name', 'classification'),
+            name=f"{args.model_name}_{args.efficientnet_variant or args.densenet_variant  or args.resnet_variant or "Default"}_inference_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             job_type="Inference",
             config={
                 "image_dir": args.image_dir,
@@ -44,7 +44,7 @@ def main():
                 "batch_size": args.batch_size,
                 "top_k": args.top_k,
             },
-            tags = ["inference", args.model_name],
+            tags = ["inference", args.model_name, args.efficientnet_variant or args.densenet_variant  or args.resnet_variant or "Default"],
         )
 
         # Dynamically create column headers for top-k + uncertainty
