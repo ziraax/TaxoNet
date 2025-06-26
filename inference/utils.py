@@ -4,43 +4,30 @@ import torch
 
 def save_results(results, output_path):
     """
-    Save the inference results to a CSV file.
+    Save the inference results to a CSV or JSON file.
 
     Args:
-        results (list): List of dicts containing image path, predictions, and optionally uncertainty.
-        output_path (str): Path to save the CSV file.
+        results (list): List of dicts containing image path and predictions.
+        output_path (str): Path to save the output file.
     """
-
     flat_rows = []
     for item in results: 
         row = {
             'image_path': item['image_path'],
         }
-        # If you want to log overall uncertainty (for top1), keep this:
-        if 'uncertainty' in item:
-            row['uncertainty'] = item['uncertainty']
 
-        # Unpack label, score, uncertainty per prediction tuple
+        # Unpack label and score per prediction tuple
         for i, pred in enumerate(item['predictions']):
-            # Handle tuple length (should be 3)
-            if len(pred) == 3:
-                label, score, uncertainty = pred
-                row[f'top{i+1}_label'] = label
-                row[f'top{i+1}_score'] = score
-                row[f'top{i+1}_uncertainty'] = uncertainty
-            elif len(pred) == 2:
-                label, score = pred
-                row[f'top{i+1}_label'] = label
-                row[f'top{i+1}_score'] = score
+            label, score = pred
+            row[f'top{i+1}_label'] = label
+            row[f'top{i+1}_score'] = score
 
         flat_rows.append(row)
 
     if output_path.endswith('.json'):
-        import json
         with open(output_path, 'w') as f:
             json.dump(flat_rows, f, indent=2)
     else:
-        import pandas as pd
         df = pd.DataFrame(flat_rows)
         df.to_csv(output_path, index=False)
 

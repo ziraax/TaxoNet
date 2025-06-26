@@ -17,12 +17,6 @@ def parse_args():
     parser.add_argument('--resnet_variant', type=str)
     parser.add_argument('--densenet_variant', type=str)
     parser.add_argument('--weights_path', type=str, required=True)
-    parser.add_argument('--mc_dropout', action='store_true',
-                        help='Enable Monte-Carlo Dropout at inference')
-    parser.add_argument('--mc_iterations', type=int, default=30,
-                        help='Number of stochastic forward passes when --mc_dropout is set')
-    parser.add_argument('--mc_dropout_p', type=float, default=0.5,
-                    help='Dropout probability used for MC Dropout (if supported by model)')
 
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--batch_size', type=int, default=16)
@@ -53,10 +47,10 @@ def main():
             tags = ["inference", args.model_name],
         )
 
-                # Dynamically create column headers for top-k + uncertainty
+        # Dynamically create column headers for top-k + uncertainty
         columns = ["Image"]
         for i in range(args.top_k):
-            columns += [f"Top{i+1}", f"Top{i+1} Score", f"Top{i+1} Uncertainty"]
+            columns += [f"Top{i+1}", f"Top{i+1} Score"]
 
         table = wandb.Table(columns=columns)
 
@@ -66,18 +60,12 @@ def main():
             row = [wandb.Image(img)]
 
             for pred in preds:
-                if len(pred) == 3:
-                    label, score, uncertainty = pred
-                elif len(pred) == 2:
                     label, score = pred
-                    uncertainty = 0.0  # fallback if missing
-                else:
-                    raise ValueError(f"Unexpected prediction format: {pred}")
-                row += [label, score, uncertainty]
+                    row += [label, score]
 
             # Pad incomplete rows if fewer than top_k
             while len(row) < len(columns):
-                row += ["", 0.0, 0.0]
+                row += ["", 0.0]
 
             table.add_data(*row)
 

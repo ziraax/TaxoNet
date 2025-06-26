@@ -2,6 +2,11 @@ import sys
 import os    
 import torch
 import torch.nn.functional as F
+from preprocessing.scalebar_removal import process_image
+from pathlib import Path
+import tempfile
+import shutil 
+import hashlib
 from ultralytics import YOLO
 from torch.utils.data import DataLoader
 from inference.dataset import InferenceDataset
@@ -25,10 +30,33 @@ def run_inference(args, CONFIG):
     """
 
 
-    image_paths = [os.path.join(args.image_dir, f) for f in os.listdir(args.image_dir)
+    orig_image_paths = [os.path.join(args.image_dir, f) for f in os.listdir(args.image_dir)
                    if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    
+    temp_processed_dir = Path(tempfile.mkdtemp(prefix="inference_processed_"))
 
+    scalebar_model = YOLO(CONFIG['scalebar_model_path'])
+    scalebar_model.conf = CONFIG['scalebar_confidence']
+
+    processed_to_original = {}
+    processed_image_paths = []
+    for orig_path in orig_image_paths:
+        process_image(orig_path, temp_processed_dir, scalebar_model)
+
+        with open(orig_path, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()[:8]
+        processed_path = temp_processed_dir / f"{Path(orig_path).stem}_{file_hash}.jpg"
+        if processed_path.exists():
+            processed_image_paths.append(str(processed_path))
+            processed_to_original[str(processed_path)] = orig_path
+        else:
+            print(f"[WARNING] Processed image not found: {processed_path}. Skipping this image.")
+
+    
+    image_paths = processed_image_paths
+        
     class_names = get_classes_names()
+    print("[INFO] Number of classes:", len(class_names))
     CONFIG['num_classes'] = len(class_names)
     if args.model_name == 'densenet':
         CONFIG['model_variant'] = args.densenet_variant
@@ -68,63 +96,39 @@ def run_inference(args, CONFIG):
             efficientnet_variant=args.efficientnet_variant,
             densenet_variant=args.densenet_variant,
             resnet_variant=args.resnet_variant,
-            mc_dropout=args.mc_dropout,
-            mc_p=args.mc_dropout_p if hasattr(args, "mc_dropout_p") else 0.5  # optional dropout prob        
+            mc_dropout=False,
+            mc_p=False        
         )
 
-        model.load_state_dict(torch.load(args.weights_path, map_location=args.device))
-        model = model.to(args.device)
 
-        # By default, we enable eval mode
+        model.load_state_dict(torch.load("model_weights/densenet/169/leafy-sweep-26/best.pt", map_location="cuda"))
+        model = model.to(args.device)
         model.eval()
 
-        def enable_mc_dropout(m):
-            if isinstance(m, torch.nn.Dropout):
-                m.train()
-
-        #--------- Monte Carlo Dropout ---------
-        if args.mc_dropout:
-            model.apply(enable_mc_dropout)
-            mc_iters = args.mc_iterations
-        else:
-            mc_iters = 1
         #---------------------------------------
         # Perform batch inference
         with torch.no_grad():
             for batch_images, batch_paths in dataloader:
                 batch_images = batch_images.to(args.device)
-
-                #--- Collect logits over N passes
-                mc_logits = []	
-                for _ in range(mc_iters):
-                    logits = model(batch_images)            # (B, C)
-                    mc_logits.append(logits.unsqueeze(0))   # (1, B, C)
-                
-                logits_stack = torch.cat(mc_logits, dim=0)  # (N, B, C)
-
-                # Compute probabilities (softmax) for each MC pass
-                probs_stack = F.softmax(logits_stack, dim=2)
-                # (N, B, C) -> (B, C)
-                mean_probs = probs_stack.mean(dim=0)
-                std_probs = probs_stack.std(dim=0)
-                
+                logits = model(batch_images)  # (B, C)
+                probs = F.softmax(logits, dim=1)  # (B, C)
 
                 for i, path in enumerate(batch_paths):
-                    # Top-k indices and scores from mean probs
-                    topk_scores, topk_indices = mean_probs[i].topk(args.top_k)
-
-                    preds_with_uncertainty = []
+                    topk_scores, topk_indices = probs[i].topk(args.top_k)
+                    preds = []
                     for score, idx in zip(topk_scores, topk_indices):
                         class_name = class_names[idx]
-                        uncertainty = std_probs[i, idx].item()
-                        preds_with_uncertainty.append((class_name, round(score.item(), 4), round(uncertainty, 4)))
-
+                        preds.append((class_name, round(score.item(), 4)))
                     all_results.append({
-                        'image_path': path,
-                        'predictions': preds_with_uncertainty
+                        'image_path': processed_to_original.get(str(path), str(path)),
+                        'predictions': preds
                     })
+
+
+
     if args.save_csv:
         from inference.utils import save_results
         save_results(all_results, args.save_csv)
+
 
     return all_results
