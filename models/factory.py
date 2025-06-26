@@ -9,7 +9,7 @@ def create_model(
         pretrained=True, 
         freeze_backbone=False, 
         efficientnet_variant="b0", 
-        densenet_variant="densenet121",
+        densenet_variant="121",
         resnet_variant="50",
         mc_dropout=False,
         mc_p=0.3
@@ -60,7 +60,7 @@ def create_model(
     
 
     elif model_name == 'resnet':
-        print(f"[INFO] Using ResNet with pretrained={pretrained} and freeze_backbone={freeze_backbone}")
+        print(f"[INFO] Using ResNet with variant {resnet_variant} with pretrained={pretrained} and freeze_backbone={freeze_backbone}")
         return ResNetClassifier(
             num_classes=num_classes,
             variant=resnet_variant,
