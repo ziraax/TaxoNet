@@ -5,7 +5,7 @@ import wandb
 
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from datetime import datetime
 
 def organize_final_structure():
@@ -15,16 +15,16 @@ def organize_final_structure():
 
     minimum_images_per_class = 10
 
-    processed_path = Path(CONFIG['processed_path'])
-    yolo_path = Path(CONFIG['yolo_dataset_path'])
+    processed_path = Path(DEFAULT_CONFIG['processed_path'])
+    yolo_path = Path(DEFAULT_CONFIG['final_dataset_path'])
 
-    # Create YOLO directory structure
+    # Create final dataset directory structure
     splits = ['train', 'val', 'test']
     for split in splits:
         (yolo_path / split).mkdir(parents=True, exist_ok=True)
 
     # Logs directory in root (not under yolo_path)
-    root_path = Path(CONFIG.get("root", "."))
+    root_path = Path(DEFAULT_CONFIG.get("root", "."))
     logs_dir = root_path / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -64,16 +64,16 @@ def organize_final_structure():
     # Train/val/test split
     train, temp = train_test_split(
         all_images,
-        test_size=1 - CONFIG['train_ratio'],
+        test_size=1 - DEFAULT_CONFIG['train_ratio'],
         stratify=[x[1] for x in all_images],
-        random_state=CONFIG['seed']
+        random_state=DEFAULT_CONFIG['seed']
     )
 
     val, test = train_test_split(
         temp,
-        test_size=CONFIG['test_ratio'] / (CONFIG['val_ratio'] + CONFIG['test_ratio']),
+        test_size=DEFAULT_CONFIG['test_ratio'] / (DEFAULT_CONFIG['val_ratio'] + DEFAULT_CONFIG['test_ratio']),
         stratify=[x[1] for x in temp],
-        random_state=CONFIG['seed']
+        random_state=DEFAULT_CONFIG['seed']
     )
 
     # Move images into split/class folders
@@ -91,5 +91,5 @@ def organize_final_structure():
                     print(f"[WARNING] Missing source file: {src_path}")
 
     elapsed = time.time() - start_time
-    print(f"[INFO] YOLO structure organized in {elapsed:.2f} seconds.")
+    print(f"[INFO] Fianl structure organized in {elapsed:.2f} seconds.")
     wandb.log({"time_organize_yolo_structure_sec": elapsed})

@@ -11,7 +11,7 @@ import concurrent.futures
 
 from PIL import Image
 from utils import classes
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from tqdm import tqdm
 
 
@@ -20,8 +20,8 @@ def undersample_overrepresented_classes():
     Undersamples classes that exceed the augmentation threshold.
     Keeps a random subset of images up to the threshold.
     """
-    input_path = CONFIG['processed_path']
-    max_per_class = CONFIG['augmentation_threshold']
+    input_path = DEFAULT_CONFIG['processed_path']
+    max_per_class = DEFAULT_CONFIG['augmentation_threshold']
 
     for class_name in os.listdir(input_path):
         class_dir = os.path.join(input_path, class_name)
@@ -49,19 +49,19 @@ def apply_class_aware_augmentation():
     Ensures not to exceed augmentation_multiplier per image.
     Uses multiprocessing for efficiency.
     """
-    train_path = os.path.join(CONFIG['yolo_dataset_path'], 'train')
+    train_path = os.path.join(DEFAULT_CONFIG['final_dataset_path'], 'train')
     class_counts = classes()
     tasks = []
 
     for class_name, count in class_counts.items():
-        if count < CONFIG['augmentation_threshold']:
+        if count < DEFAULT_CONFIG['augmentation_threshold']:
             class_dir = os.path.join(train_path, class_name)
             original_images = sorted([
                 f for f in os.listdir(class_dir)
                 if not f.startswith('aug_') and f.lower().endswith(('.jpg', '.jpeg', '.png'))
             ])
 
-            needed = CONFIG['augmentation_threshold'] - count
+            needed = DEFAULT_CONFIG['augmentation_threshold'] - count
             num_originals = len(original_images)
 
             if num_originals == 0:
@@ -69,12 +69,12 @@ def apply_class_aware_augmentation():
                 continue
 
             per_image = max(1, math.ceil(needed / num_originals))
-            if per_image > CONFIG['augmentation_multiplier']:
-                print(f"[WARN] Class '{class_name}' cannot reach {CONFIG['augmentation_threshold']} "
-                      f"with only {num_originals} originals and multiplier={CONFIG['augmentation_multiplier']}.")
-                per_image = CONFIG['augmentation_multiplier']
+            if per_image > DEFAULT_CONFIG['augmentation_multiplier']:
+                print(f"[WARN] Class '{class_name}' cannot reach {DEFAULT_CONFIG['augmentation_threshold']} "
+                      f"with only {num_originals} originals and multiplier={DEFAULT_CONFIG['augmentation_multiplier']}.")
+                per_image = DEFAULT_CONFIG['augmentation_multiplier']
 
-            print(f"[INFO] Class {class_name}: {count} -> {CONFIG['augmentation_threshold']} | "
+            print(f"[INFO] Class {class_name}: {count} -> {DEFAULT_CONFIG['augmentation_threshold']} | "
                   f"{per_image} augmentations per image")
 
             for idx, img_name in enumerate(original_images):
@@ -100,11 +100,11 @@ def augment_image_task(args):
 
     def build_pipeline():
         return A.Compose([
-            A.HorizontalFlip(p=CONFIG['augmentation']['HorizontalFlip']),
-            A.VerticalFlip(p=CONFIG['augmentation']['VerticalFlip']),
-            A.RandomRotate90(p=CONFIG['augmentation']['Rotate90']),
-            A.RandomBrightnessContrast(p=CONFIG['augmentation']['BrightnessContrast']),
-            A.HueSaturationValue(p=CONFIG['augmentation']['HueSaturation']),
+            A.HorizontalFlip(p=DEFAULT_CONFIG['augmentation']['HorizontalFlip']),
+            A.VerticalFlip(p=DEFAULT_CONFIG['augmentation']['VerticalFlip']),
+            A.RandomRotate90(p=DEFAULT_CONFIG['augmentation']['Rotate90']),
+            A.RandomBrightnessContrast(p=DEFAULT_CONFIG['augmentation']['BrightnessContrast']),
+            A.HueSaturationValue(p=DEFAULT_CONFIG['augmentation']['HueSaturation']),
         ])
 
     try:

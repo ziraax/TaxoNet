@@ -6,7 +6,7 @@ import wandb
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 from tqdm import tqdm
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from ultralytics import YOLO
 
 
@@ -25,7 +25,7 @@ def process_image(src_path, output_dir, model):
         img = Image.open(src_path).convert("RGB")
 
         # Detect scale bars
-        results = model.predict(img, imgsz=CONFIG['scalebar_img_size'])
+        results = model.predict(img, imgsz=DEFAULT_CONFIG['scalebar_img_size'])
         boxes = results[0].boxes
 
         if boxes is not None and len(boxes) > 0:
@@ -39,8 +39,8 @@ def process_image(src_path, output_dir, model):
             processed_img = img  # Keep original if no detection
 
         # Grayscale conversion
-        if CONFIG["convert_grayscale"]:
-            if CONFIG["grayscale_mode"] == "L":
+        if DEFAULT_CONFIG["convert_grayscale"]:
+            if DEFAULT_CONFIG["grayscale_mode"] == "L":
                 processed_img = processed_img.convert("L")
             else:
                 processed_img = cv2.cvtColor(np.array(processed_img), cv2.COLOR_RGB2GRAY)
@@ -64,17 +64,17 @@ def remove_scale_bars():
     print("[INFO] Starting scale bar removal...")
     start_time = time.time()
 
-    raw_root = Path(CONFIG['raw_data_root'])
-    processed_root = Path(CONFIG['processed_path'])
+    raw_root = Path(DEFAULT_CONFIG['raw_data_root'])
+    processed_root = Path(DEFAULT_CONFIG['processed_path'])
     processed_root.mkdir(parents=True, exist_ok=True)
 
     # Load model once
-    model = YOLO(CONFIG['scalebar_model_path'])
-    model.conf = CONFIG['scalebar_confidence']
+    model = YOLO(CONFDEFAULT_CONFIGIG['scalebar_model_path'])
+    model.conf = CONFDEFAULT_CONFIGIG['scalebar_confidence']
 
     image_paths = []
-    for year in CONFIG['years']:
-        for data_type in CONFIG['types']:
+    for year in DEFAULT_CONFIG['years']:
+        for data_type in DEFAULT_CONFIG['types']:
             type_dir = raw_root / year / data_type
             if not type_dir.exists():
                 continue
