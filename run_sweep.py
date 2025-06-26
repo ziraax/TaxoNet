@@ -4,7 +4,8 @@ import random
 import numpy as np
 import torch
 import sys
-from config import CONFIG
+import copy
+from config import DEFAULT_CONFIG
 from models.factory import create_model
 from training.train import train_model
 from utils.classes import get_num_classes
@@ -18,14 +19,15 @@ def set_seed(seed):
 def sweep_train():
     #initialize wandb
     wandb.init()
-    config = wandb.config
-    CONFIG.update(dict(config))
-    CONFIG["num_classes"] = get_num_classes()
+    wandb_config = wandb.config
 
-
+    config = copy.deepcopy(DEFAULT_CONFIG)
+    config.update(dict(wandb_config))
+    config["num_classes"] = get_num_classes()
+    
     model = create_model(
-        model_name=config.model_name,
-        num_classes=CONFIG["num_classes"],
+        model_name=config['model_name'],
+        num_classes=config["num_classes"],
         pretrained=True,  # if you sweep over this too
         freeze_backbone=False,
         efficientnet_variant=config.get("efficientnet_variant", "b0"),
@@ -36,7 +38,7 @@ def sweep_train():
     )
 
     
-    train_model(model, CONFIG)
+    train_model(model, config)
 
 
 if __name__ == "__main__":
@@ -45,7 +47,7 @@ if __name__ == "__main__":
         sweep_config = yaml.safe_load(f)
 
     # This returns the sweep ID
-    sweep_id = wandb.sweep(sweep=sweep_config, project=CONFIG['project_name'])
+    sweep_id = wandb.sweep(sweep=sweep_config, project=DEFAULT_CONFIG['project_name'])
     
     # This launches the agent to run sweeps
     wandb.agent(sweep_id, function=sweep_train)

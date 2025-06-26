@@ -1,7 +1,8 @@
 import argparse
+import copy
 import wandb
 
-from config import CONFIG
+from config import DEFAULT_CONFIG 
 
 from inference.runner import run_inference
 from inference.utils import save_results
@@ -36,7 +37,7 @@ def parse_args():
     )
 
     # Add densenet_variant argument like --densenet_variant 121 or --densenet_variant 169
-    parser.add_argument('--densenet_variant', type=str, default='densenet121',
+    parser.add_argument('--densenet_variant', type=str, default='121',
         choices=['121', '169', '201', '161'], help="Variant of DenseNet to use (default: 121)"
     )
 
@@ -50,49 +51,56 @@ def parse_args():
 
     return parser.parse_args()
 
-def configure_model(args):
-    variant_map = {
-        'densenet': args.densenet_variant,
-        'efficientnet': args.efficientnet_variant,
-        'resnet': args.resnet_variant,
-        'yolov11': 'Default-cls'
-    }
+def configure_model(args, config):
+    # Proper construction of full model variant names
+    if args.model_name == 'densenet':
+        model_variant = args.densenet_variant
+    elif args.model_name == 'resnet':
+        model_variant = args.resnet_variant
+    elif args.model_name == 'efficientnet':
+        model_variant = args.efficientnet_variant
+    elif args.model_name == 'yolov11':
+        model_variant = 'Default-cls'
+    else:
+        raise ValueError(f"Unknown model name: {args.model_name}")
 
-    model_variant = variant_map.get(args.model_name, 'None')
-    num_classes = get_num_classes()
-    img_size = get_input_size_for_model(args.model_name, model_variant)
+    print(f"[INFO] Using model variant: {model_variant} for model: {args.model_name}")
 
-    CONFIG.update({
+
+    config.update({
         'model_name': args.model_name,
         'model_variant': model_variant,
-        'num_classes': num_classes,
-        'img_size': img_size,
+        'num_classes': get_num_classes(),
+        'img_size': get_input_size_for_model(config, args.model_name, model_variant=model_variant),
     })
+
 
 
 def main():
     try:
         args = parse_args()
-        configure_model(args)
 
-        print(f"[INFO] Creating model: {CONFIG['model_name']} | Variant: {CONFIG['model_variant']} | "
+        config = copy.deepcopy(DEFAULT_CONFIG)
+        config = configure_model(args, config)
+
+        print(f"[INFO] Creating model: {config['model_name']} | Variant: {config['model_variant']} | "
               f"Pretrained: {args.pretrained} | Freeze Backbone: {args.freeze_backbone}")      
           
         model = create_model(
                 args.model_name, 
-                num_classes=CONFIG['num_classes'], 
+                num_classes=config['num_classes'], 
                 pretrained=args.pretrained,
                 freeze_backbone=args.freeze_backbone,
-                efficientnet_variant=args.efficientnet_variant,
-                resnet_variant=args.resnet_variant,
-                densenet_variant=args.densenet_variant,
+                efficientnet_variant=config['model_variant'],
+                resnet_variant=config['model_variant'],
+                densenet_variant=config['model_variant'],
                 mc_dropout=args.mc_dropout,
                 mc_p=args.mc_p
         )
             
         # Run preprocessing
         # full_preprocessing()
-        train_model(model, CONFIG)
+        train_model(model, config)
 
         
     except Exception as e:
