@@ -2,7 +2,7 @@ import wandb
 import os
 import random
 
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from pathlib import Path
 
 
@@ -58,7 +58,7 @@ def log_sample_images(split='train', samples_per_class=1):
     """
     print(f"[INFO] Logging {samples_per_class} sample image(s) per class from split: '{split}'")
 
-    dataset_path = Path(CONFIG['yolo_dataset_path']) / split
+    dataset_path = Path(DEFAULT_CONFIG['final_dataset_path']) / split
     sample_images = []
 
     for class_dir in dataset_path.iterdir():

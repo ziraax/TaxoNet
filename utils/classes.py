@@ -1,5 +1,5 @@
 from collections import defaultdict
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from sklearn.utils import compute_class_weight
 
 import os
@@ -13,7 +13,7 @@ def get_classes_names():
     """
     Returns a sorted list of class names from the training directory.
     """
-    train_path = os.path.join(CONFIG['final_dataset_path'], 'train')
+    train_path = os.path.join(DEFAULT_CONFIG['final_dataset_path'], 'train')
     return sorted([d for d in os.listdir(train_path) if os.path.isdir(os.path.join(train_path, d))])
 
 
@@ -31,7 +31,7 @@ def get_class_distribution():
     """
     class_counts = defaultdict(int)
     for split in ['train', 'val', 'test']:
-        split_path = os.path.join(CONFIG['final_dataset_path'], split)
+        split_path = os.path.join(DEFAULT_CONFIG['final_dataset_path'], split)
         for class_dir in os.listdir(split_path):
             class_path = os.path.join(split_path, class_dir)
             if os.path.isdir(class_path):
@@ -41,7 +41,7 @@ def get_class_distribution():
 
 
 
-def get_class_weights(strategy="balanced"):
+def get_class_weights(config, strategy="balanced"):
     """
     Computes class weights using sklearn's compute_class_weight.
     
@@ -63,8 +63,8 @@ def get_class_weights(strategy="balanced"):
             y.extend([cls_idx] * class_counts[cls])
         weights = compute_class_weight(class_weight="balanced", classes=np.arange(len(classes)), y=np.array(y))
 
-    CONFIG['class_weights'] = weights.tolist()
-    print(f"[INFO] Computed class weights: {CONFIG['class_weights']}")
+    config['class_weights'] = weights.tolist()
+    print(f"[INFO] Computed class weights: {config['class_weights']}")
     return classes, weights
 
 

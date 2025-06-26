@@ -1,6 +1,4 @@
-from config import CONFIG
-
-def get_input_size_for_model(model_name: str, model_variant: str) -> int:
+def get_input_size_for_model(config, model_name: str, model_variant: str) -> int:
     """
     Returns the input size for the specified model.
     
@@ -32,7 +30,7 @@ def get_input_size_for_model(model_name: str, model_variant: str) -> int:
             input_size = 600
 
     # Save the size in CONFIG['img_size'] for later use
-    CONFIG['img_size'] = input_size
+    config['img_size'] = input_size
 
     # Also return it in case it's needed
     return input_size  
