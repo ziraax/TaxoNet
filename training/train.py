@@ -13,22 +13,42 @@ from training.eval import evaluate_metrics_only, evaluate_yolo_model, run_test_f
 from models.factory import create_model
 from training.loss import FocalLoss, WeightedLoss, LabelSmoothingLoss
 from utils.classes import get_class_weights
-from config import CONFIG
+from config import DEFAULT_CONFIG
 from utils.input_size import get_input_size_for_model
 from training.early_stopping import EarlyStopping
 
 def _initialize_wandb(config):
+
+    model_name = config["model_name"]
+
+    # Get the appropriate variant depending on the model
+    if model_name == "resnet":
+        variant = config.get("resnet_variant", "unknown")
+    elif model_name == "densenet":
+        variant = config.get("densenet_variant", "unknown")
+    elif model_name == "efficientnet":
+        variant = config.get("efficientnet_variant", "unknown")
+    else:
+        variant = "n/a"
+
+    config['model_variant'] = variant
+
     return wandb.init(
-        project=CONFIG['project_name'],
+        project=DEFAULT_CONFIG['project_name'],
         name=f"{config['model_name']}_{config['model_variant']}_training_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         job_type = "Training",
-        config = CONFIG,
+        config = DEFAULT_CONFIG,
         tags = ["training", config['model_name'], config['model_variant']],
     )
 
 def _setup_training_environment(config):
-    CONFIG['img_size'] = get_input_size_for_model(config['model_name'], config['model_variant'])
-    CONFIG['num_classes'] = len(get_class_weights()[0])
+    if 'img_size' not in config:
+        print(f"[WARNING] 'img_size' not found in config. Using default input size for model: {config['model_name']}")
+        config['img_size'] = get_input_size_for_model(config, config['model_name'], config.get('model_variant', 'Default-cls'))
+    
+    if 'num_classes' not in config:
+        print(f"[WARNING] 'num_classes' not found in config. Using class weights to determine number of classes.")
+        config['num_classes'] = len(get_class_weights(config, strategy="balanced")[0])
 
     config.setdefault("loss_type", "focal")  # or "labelsmoothing", "weighted"
     config.setdefault("focal_gamma", 2.0)
@@ -42,7 +62,7 @@ def _setup_training_environment(config):
     config.setdefault("labelsmoothing_epsilon", 0.1)
 
 
-    print(f"[INFO] Using input size: {CONFIG['img_size']} for model: {config['model_name']}")
+    print(f"[INFO] Using input size: {config['img_size']} for model: {config['model_name']}")
     print(f"[INFO] Using num classes: {config['num_classes']} for model: {config['model_name']}")
     print(f"[INFO] Using batch size: {config['batch_size']} for model: {config['model_name']}")
     print(f"[INFO] Using learning rate: {config['learning_rate']} for model: {config['model_name']}")
@@ -61,8 +81,8 @@ def _select_loss_function(weights, device, config):
         gamma = config.get('focal_gamma', 2.0)
         # Use per-class alpha if specified
         if config.get('use_per_class_alpha', False):
-            _, class_frequencies = get_class_weights(strategy="balanced")  # You may already have this
-            alpha = class_frequencies.to(device)  # or adjust per your needs
+            _, class_frequencies = get_class_weights(config, strategy="balanced")  # You may already have this
+            alpha = torch.tensor(class_frequencies, dtype=torch.float32).to(device)  # or adjust per your needs
         else:
             alpha = config.get('focal_alpha', 0.25)  # scalar fallback
         return FocalLoss(alpha=alpha, gamma=gamma, device=device)
@@ -127,14 +147,14 @@ def train_model(model, config):
 
         model = create_model('yolov11')
         model_path = model.train(run, config)
-        evaluate_yolo_model(model_path, config['final_dataset_path'], run_name)
+        evaluate_yolo_model(model_path, config['final_dataset_path'], run_name, config)
         return
     
     model.to(device)
     train_loader = get_train_dataloader(config)
     val_loader = get_val_dataloader(config)
     test_loader = get_test_dataloader(config)
-    _, class_weights = get_class_weights(strategy="balanced")
+    _, class_weights = get_class_weights(config, strategy="balanced")
 
     optimizer = _select_optimizer(model, config)
     scheduler = _select_scheduler(optimizer, config)
