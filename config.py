@@ -6,7 +6,7 @@ RAW_DATA_ROOT = Path("DATA/DATA_500_INDIV")
 PROCESSED_PATH = Path("DATA/processed_dataset")
 FINAL_DATASET_PATH = Path("DATA/final_dataset")
 
-CONFIG = {
+DEFAULT_CONFIG = {
     # Project configuration
     "project_name": "YOLOv11Classification500",
 
@@ -56,10 +56,10 @@ CONFIG = {
 }
 
     # Augmentation pipeline
-CONFIG["augmentation_pipeline"] = A.Compose([
-    A.HorizontalFlip(p=CONFIG['augmentation']['HorizontalFlip']),
-    A.VerticalFlip(p=CONFIG['augmentation']['VerticalFlip']),
-    A.RandomRotate90(p=CONFIG['augmentation']['Rotate90']),
-    A.RandomBrightnessContrast(p=CONFIG['augmentation']['BrightnessContrast']),
-    A.HueSaturationValue(p=CONFIG['augmentation']['HueSaturation']),
+DEFAULT_CONFIG["augmentation_pipeline"] = A.Compose([
+    A.HorizontalFlip(p=DEFAULT_CONFIG['augmentation']['HorizontalFlip']),
+    A.VerticalFlip(p=DEFAULT_CONFIG['augmentation']['VerticalFlip']),
+    A.RandomRotate90(p=DEFAULT_CONFIG['augmentation']['Rotate90']),
+    A.RandomBrightnessContrast(p=DEFAULT_CONFIG['augmentation']['BrightnessContrast']),
+    A.HueSaturationValue(p=DEFAULT_CONFIG['augmentation']['HueSaturation']),
 ])

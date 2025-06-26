@@ -10,21 +10,20 @@ import torch
 from pathlib import Path
 from ultralytics import YOLO
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score, precision_score, recall_score
-from config import CONFIG
 from tqdm import tqdm
 
 
 from PIL import Image
 from tqdm import tqdm
 
-def evaluate_yolo_model(model_path, data_dir, run_name):
+def evaluate_yolo_model(model_path, data_dir, run_name, config):
 
     wandb.init(
-        project=CONFIG['project_name'],
-        name=f"{CONFIG['model_name']}_{CONFIG['model_variant']}_evaluation_{run_name}",
+        project=config['project_name'],
+        name=f"{config['model_name']}_{config['model_variant']}_evaluation_{run_name}",
         job_type="Evaluation",
-        config=CONFIG,
-        tags=["evaluation", "custom_model", "classification", CONFIG['model_name']],
+        config=config,
+        tags=["evaluation", "custom_model", "classification", config['model_name']],
     )
 
 
