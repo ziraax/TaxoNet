@@ -1,11 +1,12 @@
-def get_input_size_for_model(config, model_name: str, model_variant: str) -> int:
+def get_input_size_for_model(model_name: str, model_variant: str, config: dict = None) -> int:
     """
     Returns the input size for the specified model.
-    
+
     Args:
         model_name (str): The name of the model.
-        mode_variant (str) : The variant of the model (if applicable).
-    
+        model_variant (str): The variant of the model (if applicable).
+        config (dict, optional): If provided, img_size will be set inside it.
+
     Returns:
         int: The input size for the model.
     """
@@ -29,8 +30,8 @@ def get_input_size_for_model(config, model_name: str, model_variant: str) -> int
         elif model_variant.lower() == "b7":
             input_size = 600
 
-    # Save the size in CONFIG['img_size'] for later use
-    config['img_size'] = input_size
+    # Set in config only if provided
+    if config is not None:
+        config['img_size'] = input_size
 
-    # Also return it in case it's needed
-    return input_size  
+    return input_size
