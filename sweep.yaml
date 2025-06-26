@@ -6,11 +6,10 @@ metric:
 parameters:
   # Model related parameters
   model_name:
-    values: ["densenet"]
+    values: ["resnet"]
 
-  model_variant:
-    values: ["121", "169", "201"]
-
+  resnet_variant:
+    values: ["18", "34", "50", "101", "152"]  # Sweep over different ResNet variants
   # Loss related parameters
   loss_type:
     values: ["weighted", "focal", "labelsmoothing"]
