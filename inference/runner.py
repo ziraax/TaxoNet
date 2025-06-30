@@ -108,7 +108,7 @@ def run_inference(args, DEFAULT_CONFIG):
             )
 
 
-            model.load_state_dict(torch.load(args.weights_path, map_location="cuda"))
+            model.load_state_dict(torch.load(args.weights_path, map_location="cpu"))
             model = model.to(args.device)
             model.eval()
 
