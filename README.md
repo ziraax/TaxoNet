@@ -11,7 +11,7 @@
 
 An end-to-end deep learning solution supporting multiple model architectures with advanced features for training, evaluation, and production-ready inference.
 
-See the related paper: [PlanktonFlow: hands-on, deep-learning classification of plankton images for biologists](https://www.biorxiv.org/content/10.1101/2025.09.19.677346v1).
+See the related preprint: [PlanktonFlow: hands-on, deep-learning classification of plankton images for biologists](https://www.biorxiv.org/content/10.1101/2025.09.19.677346v1).
 
 
 ## Table of Contents
